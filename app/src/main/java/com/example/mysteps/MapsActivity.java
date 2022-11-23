@@ -65,6 +65,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         endButton.setOnClickListener(view -> {
             activityController.stopCountSteps();
             resetCounting();
+            resetDisplayData();
         });
     }
 
@@ -86,13 +87,17 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
          */
     }
 
-    void  resetCounting (){
+    void resetCounting() {
         isAppStartedToCount = false;
         steps = 0;
+    }
+
+    void resetDisplayData(){
         stepsTextView.setText(0);
         distanceTextView.setText(0);
         totalTime.setText(0);
     }
+
     @Override
     protected void onResume() {
         super.onResume();
@@ -126,13 +131,16 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         if (sensor.getType() == Sensor.TYPE_STEP_COUNTER) {
             steps++;
         }
+        handleDisplayData(steps);
+    }
+
+    void handleDisplayData(long steps) {
         stepsTextView.setText(String.valueOf(steps));
-        float totalDistanceTravelled= activityController.getEstimatedDistanceOfSteps(steps);
+        float totalDistanceTravelled = activityController.getEstimatedDistanceOfSteps(steps);
         distanceTextView.setText(String.valueOf(totalDistanceTravelled));
 //        double averagePace =  (steps != 0) ? totalDistanceTravelled / (steps) : 0.0;
 //        totalTime.setText ( String.valueOf(totalDistanceTravelled /averagePace));
 //                totalTime.setText(String.valueOf(activityController.getEstimatedDistanceOfSteps(steps)));
-
     }
 
     @Override
