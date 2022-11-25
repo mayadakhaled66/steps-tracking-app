@@ -1,4 +1,11 @@
 <resources>
     <string name="app_name">My Steps</string>
     <string name="title_activity_maps">Map</string>
+    <string name="number_of_step">Number of step:</string>
+    <string name="end">end</string>
+    <string name="start">start</string>
+    <string name="total_distance">Total distance:</string>
+    <string name="average_time">Average Time:</string>
+    <string name="my_tracker">My Tracker</string>
+    <string name="_0">0</string>
 </resources>
