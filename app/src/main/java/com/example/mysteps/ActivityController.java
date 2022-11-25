@@ -21,10 +21,8 @@ class ActivityController implements ActivityActions {
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1234, ACTIVITY_PERMISSION_CODE = 122;
     Callable<Void> mapCallBack;
 
-    public ActivityController(SensorManager sensorManager, Sensor stepSensor, SensorEventListener listener, Activity activity,
+    public ActivityController( SensorEventListener listener, Activity activity,
                               Callable<Void> mapCallBack) {
-        this.sensorManager = sensorManager;
-        this.stepSensor = stepSensor;
         this.listener = listener;
         this.activity = activity;
         this.mapCallBack = mapCallBack;

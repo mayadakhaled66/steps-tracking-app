@@ -5,59 +5,64 @@ import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.FragmentActivity;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
-import android.hardware.SensorManager;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.os.Bundle;
-import android.util.Log;
 import android.widget.Button;
 import android.widget.TextView;
 
-import com.google.android.gms.maps.CameraUpdate;
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.example.mysteps.databinding.ActivityMapsBinding;
+import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Polyline;
+import com.google.android.gms.maps.model.PolylineOptions;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.util.ArrayList;
 
 
-public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, SensorEventListener {
+public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, SensorEventListener, LocationListener {
 
     private long steps = 0;
-    TextView distanceTextView, stepsTextView, totalTime;
-    Button startButton, endButton;
-    ActivityController activityController;
-    SensorManager sensorManager;
-    Sensor stepSensor;
-    boolean isAppStartedToCount = false;
-
+    private TextView distanceTextView, stepsTextView;//, totalTime;
+    private ActivityController activityController;
+    private GoogleMap currentGoogleMap;
+    private FusedLocationProviderClient fusedLocationClient;
+    private LocationManager locationManager;
+    private ArrayList<LatLng> points;
+    Polyline line;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         com.example.mysteps.databinding.ActivityMapsBinding activityMapsBinding = ActivityMapsBinding.inflate(getLayoutInflater());
         setContentView(activityMapsBinding.getRoot());
-        // Obtain the SupportMapFragment and get notified when the map is ready to be used.
-        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
-                .findFragmentById(R.id.map);
-        if (mapFragment != null) {
-            mapFragment.getMapAsync(this);
-        }
+        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+        initMap();
         initializeData();
     }
 
     void initializeData() {
+        points = new ArrayList<>();
         stepsTextView = findViewById(R.id.numberOfStepTextViewValue);
         distanceTextView = findViewById(R.id.totalDistanceTextViewValue);
-        totalTime = findViewById(R.id.averageTimeTextViewValue);
-        startButton = findViewById(R.id.startButton);
-        endButton = findViewById(R.id.endButton);
-        activityController = new ActivityController(sensorManager, stepSensor, this, this, () -> {
+//      totalTime = findViewById(R.id.averageTimeTextViewValue);
+        Button startButton = findViewById(R.id.startButton);
+        Button endButton = findViewById(R.id.endButton);
+        activityController = new ActivityController(this, this, () -> {
+            points.clear();
             initMap();
             return null;
         });
@@ -75,27 +80,27 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             new ActivityPermissions(this).getLocationPermission();
             return;
         }
-        googleMap.setMyLocationEnabled(true);
-        googleMap.getUiSettings().setMyLocationButtonEnabled(true);
-        CameraUpdate cameraUpdate = CameraUpdateFactory.newCameraPosition(googleMap.getCameraPosition());
-        googleMap.moveCamera(cameraUpdate);
-        /*
-        LatLng latLng = googleMap.getCameraPosition().target;
-        float zoomLevel = 9.5f;
-        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, zoomLevel));
-//        googleMap.moveCamera(cameraUpdate);
-         */
+        currentGoogleMap = googleMap;
+        currentGoogleMap.setMyLocationEnabled(true);
+        currentGoogleMap.getUiSettings().setMyLocationButtonEnabled(true);
+        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 0, this);
+        fusedLocationClient.getLastLocation().addOnSuccessListener(this, location -> {
+            if (location != null) {
+                LatLng newCoordinates = new LatLng(location.getLatitude(), location.getLongitude());
+                currentGoogleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(newCoordinates, 17));
+            }
+        });
     }
 
     void resetCounting() {
-        isAppStartedToCount = false;
         steps = 0;
+        points.clear();
     }
 
-    void resetDisplayData(){
-        stepsTextView.setText(0);
-        distanceTextView.setText(0);
-        totalTime.setText(0);
+    void resetDisplayData() {
+        stepsTextView.setText(String.valueOf(0));
+        distanceTextView.setText(String.valueOf(0));
+//        totalTime.setText(0);
     }
 
     @Override
@@ -136,11 +141,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     void handleDisplayData(long steps) {
         stepsTextView.setText(String.valueOf(steps));
-        float totalDistanceTravelled = activityController.getEstimatedDistanceOfSteps(steps);
-        distanceTextView.setText(String.valueOf(totalDistanceTravelled));
-//        double averagePace =  (steps != 0) ? totalDistanceTravelled / (steps) : 0.0;
+        float totalDistanceTravelled = steps > 2 ? activityController.getEstimatedDistanceOfSteps(steps) : 0;
+        distanceTextView.setText(String.format("%s KM", totalDistanceTravelled));
 //        totalTime.setText ( String.valueOf(totalDistanceTravelled /averagePace));
-//                totalTime.setText(String.valueOf(activityController.getEstimatedDistanceOfSteps(steps)));
+//        totalTime.setText(String.valueOf(activityController.getEstimatedDistanceOfSteps(steps)));
     }
 
     @Override
@@ -152,6 +156,25 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         activityController.checkPermissions(requestCode, grantResults);
+    }
+
+    @Override
+    public void onLocationChanged(@NonNull Location location) {
+        LatLng newCoordinates = new LatLng(location.getLatitude(), location.getLongitude());
+        currentGoogleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(newCoordinates, 17));
+        points.add(newCoordinates);
+        redrawLine();
+    }
+
+    private void redrawLine() {
+        currentGoogleMap.clear();
+        PolylineOptions options = new PolylineOptions().width(15).color(Color.BLUE).geodesic(true);
+        for (int counter = 0; counter < points.size(); counter++) {
+            LatLng point = points.get(counter);
+            options.add(point);
+        }
+
+        line = currentGoogleMap.addPolyline(options);
     }
 
 }
